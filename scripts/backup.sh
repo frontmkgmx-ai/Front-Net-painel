@@ -21,4 +21,14 @@ cp .env "$TARGET_DIR/.env.backup"
 echo "[4/4] Creating tarball of physical storage..."
 tar -czf "$TARGET_DIR/storage.tar.gz" -C /opt/mycloud storage
 
+echo "[INFO] Generating manifest.json..."
+cat <<EOF > "$TARGET_DIR/manifest.json"
+{
+  "date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "version": "1.0.0",
+  "services": ["mysql", "mongodb", "storage"],
+  "status": "success"
+}
+EOF
+
 echo "[SUCCESS] Backup completed successfully!"

@@ -1,25 +1,65 @@
-# MyCloud Panel Documentation
+# MyCloud Panel
 
-MyCloud Panel is a professional infrastructure and file management control panel designed for VPS deployments.
+Professional Full Stack Cloud Administration Panel, designed for VPS deployment via Docker.
 
 ## Architecture
 
-- **Frontend:** React, TypeScript, Tailwind CSS, Vite
-- **Backend:** Node.js, Express, TypeScript, Prisma (MySQL)
-- **Databases:** MySQL (Relational), MongoDB (Document), Redis (Cache & Queue)
-- **Infrastructure:** Docker & Docker Compose
-- **Web Server / Proxy:** Nginx (with Let's Encrypt SSL via Certbot)
+- **Frontend:** React 19, TypeScript, Vite, TailwindCSS
+- **Backend:** Node.js, Express, Prisma (MySQL) & Mongoose (MongoDB)
+- **Databases:** MySQL (Relational), MongoDB (Document), Redis (Caching/Queues)
+- **Reverse Proxy:** Nginx with Let's Encrypt SSL ready
+- **Storage:** Persisted physically to `/opt/mycloud/storage`
 
-## Installation
+## INSTALAÇÃO RÁPIDA NA VPS
 
-See `INSTALL.md` for detailed installation instructions on Ubuntu.
+1. Conecte-se à sua VPS via SSH (Ubuntu 24.04 LTS ou compatível, amd64/arm64).
+2. Clone o repositório e execute a instalação automática:
 
-## Features
+```bash
+git clone <URL_DO_REPOSITORIO>
+cd <PASTA_DO_PROJETO>
 
-- Complete Role-Based Access Control (SUPER_ADMIN, ADMIN, USER)
-- Real-time system monitoring
-- MySQL, MongoDB, and Redis management
-- Docker container monitoring
-- Cloud Storage file management with Chunked Uploads
-- Audit logging for administrative actions
-- Secure authentication with Argon2 password hashing and JWT
+cp .env.example .env
+
+# Opcional: Edite manualmente ou deixe o instalador gerar os secrets automaticamente
+nano .env
+
+# Execute o instalador master
+sudo ./scripts/install.sh
+```
+
+3. Verifique o status da implantação:
+```bash
+sudo ./scripts/status.sh
+sudo ./scripts/healthcheck.sh
+```
+
+## Comandos Administrativos
+
+| Comando | Descrição |
+|---|---|
+| `sudo ./scripts/install.sh` | Instalação do zero, gera diretórios & secrets |
+| `sudo ./scripts/start.sh` | Inicia todos os containers |
+| `sudo ./scripts/stop.sh` | Para todos os containers com segurança |
+| `sudo ./scripts/restart.sh` | Reinicia o ecossistema |
+| `sudo ./scripts/update.sh` | Atualiza repositório, builda e executa migrations sem perda de dados |
+| `sudo ./scripts/backup.sh` | Dump de bancos e compactação de arquivos para `/opt/mycloud/backups` |
+| `sudo ./scripts/restore.sh` | Restaura a partir de um backup específico |
+| `sudo ./scripts/status.sh` | Exibe consumo de CPU, RAM, Disco e Containers |
+| `sudo ./scripts/healthcheck.sh` | Verifica conexões internas do banco e da API |
+| `sudo ./scripts/logs.sh` | Live tail dos logs (pode passar o nome do container, ex: `backend`) |
+| `sudo ./scripts/migrate.sh` | Executa migrations do Prisma |
+| `sudo ./scripts/uninstall.sh` | Remoção da plataforma (Exige confirmação para exclusão de dados) |
+
+## Segurança
+- **Bancos Isolados:** Portas 3306, 27017 e 6379 ficam restritas à rede interna `private_net`.
+- **Criptografia de Senha:** Uso de `Argon2id` para máxima resistência.
+- **RBAC:** Sistema de permissões escalonado.
+- **Sanitização de Paths:** Proteção contra `../` (Path Traversal) no módulo de storage.
+
+## Configuração HTTPS (Let's Encrypt)
+Após propagar o IP no DNS para `mycloud.cysmk.online`:
+```bash
+docker compose exec -T certbot certbot --nginx -d mycloud.cysmk.online
+```
+*(Descomente a seção SSL no `docker/nginx/conf.d/default.conf` e faça restart)*

@@ -11,6 +11,14 @@ if [ ! -d "$BACKUP_DIR" ]; then
   exit 1
 fi
 
+if [ ! -f "$BACKUP_DIR/manifest.json" ]; then
+  echo "[WARNING] No manifest.json found in backup directory. This might be an older backup."
+else
+  echo "--- Backup Details ---"
+  cat "$BACKUP_DIR/manifest.json"
+  echo "----------------------"
+fi
+
 echo "======================================================================="
 echo "                             WARNING"
 echo "======================================================================="

@@ -1,40 +1,32 @@
-# Installation Guide
+# MyCloud Panel - Install Guide
 
-## Requirements
-- Ubuntu 20.04 or 22.04 LTS (x86_64 or ARM64)
-- At least 2GB RAM (4GB+ recommended)
-- Root or sudo privileges
-- A domain name pointed to your server's IP (e.g. `mycloud.cysmk.online`)
+## INSTALAÇÃO NA VPS
 
-## Steps
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/mycloud-panel.git
-   cd mycloud-panel
-   ```
-
-2. Run the interactive installer:
-   ```bash
-   chmod +x install.sh
-   ./install.sh
-   ```
-
-3. The installer will:
-   - Install Docker & Docker Compose (if missing)
-   - Create the `.env` file with secure random passwords
-   - Create necessary storage directories at `/opt/mycloud/storage`
-   - Start the Docker containers
-
-4. Access the panel:
-   Open your browser and navigate to your domain or server IP.
-   Check the `.env` file for your initial admin credentials.
-
-## Setting up SSL (HTTPS)
-
-The `docker-compose.yml` includes an Nginx reverse proxy and Certbot.
-To generate an SSL certificate, ensure your domain points to the server IP and run:
+1. Conecte-se à sua VPS via SSH (Ubuntu 24.04 LTS ou compatível, amd64/arm64).
+2. Clone o repositório e execute a instalação automática:
 
 ```bash
-docker exec -it mycloud-certbot certbot --nginx -d mycloud.cysmk.online
+git clone <URL_DO_REPOSITORIO>
+cd <PASTA_DO_PROJETO>
+
+cp .env.example .env
+
+# Opcional: Edite manualmente ou deixe o instalador gerar os secrets automaticamente
+nano .env
+
+# Execute o instalador master
+sudo ./scripts/install.sh
 ```
+
+3. Verifique o status da implantação:
+```bash
+sudo ./scripts/status.sh
+sudo ./scripts/healthcheck.sh
+```
+
+## Troubleshooting
+
+- **Bancos de dados não sobem:** Verifique se as portas não estão em uso por processos locais (embora o painel use redes internas, conflitos de IP na bridge podem ocorrer).
+- **Frontend não acessível:** Confirme se as portas 80/443 estão liberadas no Firewall da sua VPS (UFW / Security Lists da nuvem).
+- **HTTPS falhou:** O comando do certbot requer que o DNS já esteja propagado para o IP da VPS. Verifique no ping e tente executar `docker compose exec -T certbot certbot --nginx -d mycloud.cysmk.online` novamente.
+- **Limitações ARM64:** O projeto foi projetado utilizando imagens multi-arch, caso sua VPS utilize ARM64 (ex: Oracle Cloud Ampere), os containers buildados localmente e imagens `mysql`, `mongo`, `redis`, `node:20-alpine` devem funcionar nativamente.

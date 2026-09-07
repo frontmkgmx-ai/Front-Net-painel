@@ -31,6 +31,7 @@ fi
 echo "[INFO] Creating directory structure..."
 mkdir -p /opt/mycloud/{app,data/mysql,data/mongodb,data/redis,storage,backups,logs,config}
 chmod -R 755 /opt/mycloud
+chmod +x scripts/*.sh
 
 if [ ! -f .env ]; then
   echo "[INFO] Generating secure .env file..."
