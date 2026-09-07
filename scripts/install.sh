@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "========================================"
-echo "   MyCloud Panel - Install Script"
+echo "   MyCloud Panel - Enterprise v3.0 Installer"
 echo "========================================"
 
 if [ "$EUID" -ne 0 ]; then
@@ -11,7 +11,19 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 ARCH=$(uname -m)
+OS=$(grep -E '^(ID|VERSION_ID)=' /etc/os-release | tr '\n' ' ')
+echo "[INFO] Detected OS: $OS"
 echo "[INFO] Detected Architecture: $ARCH"
+
+# Minimum RAM check
+TOTAL_RAM=$(free -m | awk '/^Mem:/{print $2}')
+if [ "$TOTAL_RAM" -lt 1500 ]; then
+    echo "[WARNING] System has less than 2GB RAM (${TOTAL_RAM}MB detected). Performance may be degraded."
+    read -p "Continue anyway? (y/N): " ram_confirm
+    if [[ ! "$ram_confirm" =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+fi
 
 echo "[INFO] Checking dependencies..."
 for pkg in curl git openssl; do
@@ -49,7 +61,9 @@ else
   echo "[INFO] .env file already exists. Skipping secret generation to preserve existing data."
 fi
 
+# Ensure docker group exists and we add the current user if needed, but we run as root anyway
 echo "[INFO] Starting Docker containers..."
+docker compose pull
 docker compose up -d --build
 
 echo "[INFO] Waiting for databases to become healthy (30s)..."
@@ -66,5 +80,6 @@ grep "ADMIN_INITIAL_" .env
 echo "========================================"
 echo "Useful commands:"
 echo "  sudo ./scripts/status.sh"
+echo "  sudo ./scripts/doctor.sh"
 echo "  sudo ./scripts/logs.sh"
 echo "========================================"

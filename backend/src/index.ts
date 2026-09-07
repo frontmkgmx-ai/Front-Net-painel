@@ -11,6 +11,8 @@ import authRoutes from './routes/auth';
 import storageRoutes from './routes/storage';
 import systemRoutes from './routes/system';
 import usersRoutes from './routes/users';
+import dockerRoutes from './routes/docker';
+import appsRoutes from './routes/apps';
 import { errorHandler } from './middlewares/errorHandler';
 import { setupInitialAdmin } from './services/setup';
 
@@ -60,6 +62,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/system', systemRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/docker', dockerRoutes);
+app.use('/api/apps', appsRoutes);
 
 // Health check
 app.get('/api/health', async (req, res) => {

@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
-import { Shield, HardDrive, LayoutDashboard, Database, Server, Settings, Users, LogOut, Lock } from 'lucide-react';
+import { Shield, HardDrive, LayoutDashboard, Database, Server, Settings, Users, LogOut, Lock, Box } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Storage from './pages/Storage';
 import System from './pages/System';
+import Docker from './pages/Docker';
 import Login from './pages/Login';
 import UsersPage from './pages/Users';
 import Databases from './pages/Databases';
@@ -31,6 +32,9 @@ const Sidebar = () => {
         </Link>
         <Link to="/databases" className="flex items-center gap-3 p-3 rounded hover:bg-slate-800 transition">
           <Database className="w-5 h-5" /> Databases
+        </Link>
+        <Link to="/docker" className="flex items-center gap-3 p-3 rounded hover:bg-slate-800 transition">
+          <Box className="w-5 h-5" /> Docker
         </Link>
         <Link to="/system" className="flex items-center gap-3 p-3 rounded hover:bg-slate-800 transition">
           <Server className="w-5 h-5" /> System
@@ -94,6 +98,7 @@ export default function App() {
         <Route path="/" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
         <Route path="/storage" element={<PrivateRoute><Layout><Storage /></Layout></PrivateRoute>} />
         <Route path="/system" element={<PrivateRoute><Layout><System /></Layout></PrivateRoute>} />
+        <Route path="/docker" element={<PrivateRoute><Layout><Docker /></Layout></PrivateRoute>} />
         <Route path="/databases" element={<PrivateRoute><Layout><Databases /></Layout></PrivateRoute>} />
         <Route path="/security" element={<PrivateRoute><Layout><Security /></Layout></PrivateRoute>} />
         <Route path="/settings" element={<PrivateRoute><Layout><SettingsPage /></Layout></PrivateRoute>} />

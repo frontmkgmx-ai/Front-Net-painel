@@ -9,11 +9,10 @@ generator client {
 
 model Role {
   id          String       @id @default(uuid())
-  name        String       @unique
+  name        String       @unique // OWNER, ADMIN, OPERATOR, DEVELOPER, VIEWER
   description String?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-
   users       User[]
   permissions RolePermission[]
 }
@@ -23,17 +22,14 @@ model Permission {
   name        String       @unique
   description String?
   createdAt   DateTime     @default(now())
-
   roles       RolePermission[]
 }
 
 model RolePermission {
   roleId       String
   permissionId String
-
   role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-
   @@id([roleId, permissionId])
 }
 
@@ -54,6 +50,7 @@ model User {
   files      File[]
   quotas     Quota[]
   usages     Usage[]
+  deployments Deployment[]
 }
 
 model Session {
@@ -64,7 +61,6 @@ model Session {
   userAgent String?
   expiresAt DateTime
   createdAt DateTime @default(now())
-
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -72,17 +68,19 @@ model AuditLog {
   id        String   @id @default(uuid())
   userId    String?
   action    String
+  resource  String?
   details   Json?
   ipAddress String?
+  userAgent String?
+  correlationId String?
   createdAt DateTime @default(now())
-
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 }
 
 model Setting {
   id        String   @id @default(uuid())
   key       String   @unique
-  value     String
+  value     String   @db.Text
   updatedAt DateTime @updatedAt
 }
 
@@ -93,17 +91,113 @@ model ApiKey {
   name      String
   expiresAt DateTime?
   createdAt DateTime @default(now())
-
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// ----------------------------------------------------------------------
+// NEW: PaaS / Infrastructure Models
+// ----------------------------------------------------------------------
+
+model Project {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  environments Environment[]
+}
+
+model Environment {
+  id          String   @id @default(uuid())
+  projectId   String
+  name        String   // e.g., Production, Staging
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  applications Application[]
+  @@unique([projectId, name])
+}
+
+model Application {
+  id            String   @id @default(uuid())
+  environmentId String
+  name          String
+  description   String?
+  
+  // Deploy Config
+  sourceType    String   @default("IMAGE") // IMAGE, GIT
+  imageName     String?  // for IMAGE
+  gitRepoUrl    String?  // for GIT
+  gitBranch     String?
+  buildCmd      String?
+  startCmd      String?
+  internalPort  Int?
+  
+  // Docker Run Config
+  replicas      Int      @default(1)
+  cpuLimit      Float?
+  memoryLimit   Int?     // in MB
+  restartPolicy String   @default("unless-stopped")
+  
+  // Status
+  status        String   @default("STOPPED") // RUNNING, STOPPED, ERROR, DEPLOYING
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  environment   Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  deployments   Deployment[]
+  domains       Domain[]
+  envs          AppEnvVar[]
+}
+
+model AppEnvVar {
+  id            String   @id @default(uuid())
+  applicationId String
+  key           String
+  value         String   @db.Text
+  isSecret      Boolean  @default(false)
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  @@unique([applicationId, key])
+}
+
+model Deployment {
+  id            String   @id @default(uuid())
+  applicationId String
+  userId        String?
+  commitSha     String?
+  commitMsg     String?
+  status        String   // PENDING, BUILDING, DEPLOYING, SUCCESS, FAILED
+  logs          String?  @db.LongText
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user          User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model Domain {
+  id            String   @id @default(uuid())
+  applicationId String?
+  name          String   @unique
+  proxyType     String   @default("NGINX")
+  sslStatus     String   @default("NONE") // NONE, PROVISIONING, ACTIVE, FAILED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+}
+
+// ----------------------------------------------------------------------
+// Storage Models (Existing, enhanced)
+// ----------------------------------------------------------------------
 model Bucket {
   id        String   @id @default(uuid())
   name      String   @unique
   ownerId   String
+  provider  String   @default("LOCAL") // LOCAL, S3
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   owner User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   files File[]
   folders Folder[]
@@ -115,7 +209,6 @@ model Folder {
   name      String
   parentId  String?
   createdAt DateTime @default(now())
-
   bucket    Bucket   @relation(fields: [bucketId], references: [id], onDelete: Cascade)
   parent    Folder?  @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Cascade)
   children  Folder[] @relation("FolderToFolder")
@@ -127,15 +220,15 @@ model File {
   bucketId  String
   folderId  String?
   name      String
-  path      String
+  path      String   @db.Text
   size      BigInt
   mimeType  String
   hash      String?
   ownerId   String
+  isTemp    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   version   Int      @default(1)
-
   bucket Bucket @relation(fields: [bucketId], references: [id], onDelete: Cascade)
   folder Folder? @relation(fields: [folderId], references: [id], onDelete: Cascade)
   owner  User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -145,12 +238,11 @@ model File {
 model FileVersion {
   id        String   @id @default(uuid())
   fileId    String
-  path      String
+  path      String   @db.Text
   size      BigInt
   hash      String?
   version   Int
   createdAt DateTime @default(now())
-
   file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
 }
 
@@ -161,7 +253,6 @@ model Quota {
   maxStorage  BigInt   @default(1073741824) // 1GB
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -171,7 +262,5 @@ model Usage {
   usedBuckets Int      @default(0)
   usedStorage BigInt   @default(0)
   updatedAt   DateTime @updatedAt
-
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
-
