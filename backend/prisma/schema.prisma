@@ -1,0 +1,177 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Role {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  description String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  users       User[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  description String?
+  createdAt   DateTime     @default(now())
+
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  roleId    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  role       Role?      @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  sessions   Session[]
+  auditLogs  AuditLog[]
+  apiKeys    ApiKey[]
+  buckets    Bucket[]
+  files      File[]
+  quotas     Quota[]
+  usages     Usage[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  details   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model Setting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model ApiKey {
+  id        String   @id @default(uuid())
+  userId    String
+  key       String   @unique
+  name      String
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Bucket {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  files File[]
+  folders Folder[]
+}
+
+model Folder {
+  id        String   @id @default(uuid())
+  bucketId  String
+  name      String
+  parentId  String?
+  createdAt DateTime @default(now())
+
+  bucket    Bucket   @relation(fields: [bucketId], references: [id], onDelete: Cascade)
+  parent    Folder?  @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Folder[] @relation("FolderToFolder")
+  files     File[]
+}
+
+model File {
+  id        String   @id @default(uuid())
+  bucketId  String
+  folderId  String?
+  name      String
+  path      String
+  size      BigInt
+  mimeType  String
+  hash      String?
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  version   Int      @default(1)
+
+  bucket Bucket @relation(fields: [bucketId], references: [id], onDelete: Cascade)
+  folder Folder? @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  owner  User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  versions FileVersion[]
+}
+
+model FileVersion {
+  id        String   @id @default(uuid())
+  fileId    String
+  path      String
+  size      BigInt
+  hash      String?
+  version   Int
+  createdAt DateTime @default(now())
+
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+}
+
+model Quota {
+  id          String   @id @default(uuid())
+  userId      String
+  maxBuckets  Int      @default(5)
+  maxStorage  BigInt   @default(1073741824) // 1GB
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Usage {
+  id          String   @id @default(uuid())
+  userId      String
+  usedBuckets Int      @default(0)
+  usedStorage BigInt   @default(0)
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+

@@ -1,0 +1,28 @@
+#!/bin/bash
+set -euo pipefail
+
+if [ "$EUID" -ne 0 ]; then
+  echo "[ERROR] This script must be run as root or with sudo."
+  exit 1
+fi
+
+echo "[INFO] Updating MyCloud Panel..."
+
+echo "[INFO] Pulling latest code..."
+git pull origin main
+
+echo "[INFO] Pulling base images..."
+docker compose pull
+
+echo "[INFO] Rebuilding and starting containers..."
+docker compose up -d --build
+
+echo "[INFO] Running database migrations..."
+sleep 15
+./scripts/migrate.sh
+
+echo "[INFO] Cleaning up dangling images..."
+docker image prune -f
+
+echo "[SUCCESS] Update completed successfully!"
+./scripts/status.sh
