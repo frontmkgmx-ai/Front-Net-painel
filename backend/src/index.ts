@@ -13,6 +13,8 @@ import systemRoutes from './routes/system';
 import usersRoutes from './routes/users';
 import dockerRoutes from './routes/docker';
 import appsRoutes from './routes/apps';
+import databaseRoutes from "./routes/database";
+import marketplaceRoutes from "./routes/marketplace";
 import { errorHandler } from './middlewares/errorHandler';
 import { setupInitialAdmin } from './services/setup';
 
@@ -64,6 +66,8 @@ app.use('/api/system', systemRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/docker', dockerRoutes);
 app.use('/api/apps', appsRoutes);
+app.use("/api/databases", databaseRoutes);
+app.use("/api/marketplace", marketplaceRoutes);
 
 // Health check
 app.get('/api/health', async (req, res) => {

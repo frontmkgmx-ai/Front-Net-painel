@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { DockerService } from '../services/dockerService';
 
 const prisma = new PrismaClient();
 
@@ -30,6 +31,15 @@ const TEMPLATES = [
     category: 'Automation',
     image: 'n8nio/n8n:latest',
     defaultPort: 5678,
+  },
+  {
+    id: 'nginx',
+    name: 'Nginx',
+    slug: 'nginx',
+    description: 'High performance web server and reverse proxy.',
+    category: 'Web Server',
+    image: 'nginx:alpine',
+    defaultPort: 80,
   }
 ];
 
@@ -46,10 +56,24 @@ export const deployTemplate = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Template not found' });
     }
 
+    let targetEnvId = environmentId;
+    if (!targetEnvId) {
+      // Find or create default environment
+      let defaultProj = await prisma.project.findFirst({ where: { name: 'Default Project' } });
+      if (!defaultProj) {
+        defaultProj = await prisma.project.create({ data: { name: 'Default Project' } });
+      }
+      let defaultEnv = await prisma.environment.findFirst({ where: { projectId: defaultProj.id } });
+      if (!defaultEnv) {
+        defaultEnv = await prisma.environment.create({ data: { name: 'Production', projectId: defaultProj.id } });
+      }
+      targetEnvId = defaultEnv.id;
+    }
+
     const app = await prisma.application.create({
       data: {
         name,
-        environmentId,
+        environmentId: targetEnvId,
         sourceType: 'MARKETPLACE',
         imageName: template.image,
         internalPort: template.defaultPort,
@@ -57,7 +81,15 @@ export const deployTemplate = async (req: Request, res: Response) => {
       }
     });
 
-    // In a real implementation we would use Orchestrator here
+    // Deploy
+    DockerService.deployApplication(app, {})
+      .then(async () => {
+        await prisma.application.update({ where: { id: app.id }, data: { status: 'RUNNING' } });
+      })
+      .catch(async (err) => {
+        console.error('Failed to deploy app:', err);
+        await prisma.application.update({ where: { id: app.id }, data: { status: 'ERROR' } });
+      });
 
     res.status(201).json(app);
   } catch (error) {

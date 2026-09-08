@@ -13,6 +13,8 @@ import Docker from './pages/Docker';
 import Login from './pages/Login';
 import UsersPage from './pages/Users';
 import Databases from './pages/Databases';
+import Applications from './pages/Applications';
+import Marketplace from './pages/Marketplace';
 import Security from './pages/Security';
 import SettingsPage from './pages/Settings';
 import { useAuthStore } from './store/authStore';
@@ -158,8 +160,8 @@ export default function App() {
         
         <Route path="/" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
         <Route path="/projects" element={<PrivateRoute><Layout><Placeholder title="Projects" /></Layout></PrivateRoute>} />
-        <Route path="/applications" element={<PrivateRoute><Layout><Placeholder title="Applications" /></Layout></PrivateRoute>} />
-        <Route path="/marketplace" element={<PrivateRoute><Layout><Placeholder title="Marketplace" /></Layout></PrivateRoute>} />
+        <Route path="/applications" element={<PrivateRoute><Layout><Applications /></Layout></PrivateRoute>} />
+        <Route path="/marketplace" element={<PrivateRoute><Layout><Marketplace /></Layout></PrivateRoute>} />
         <Route path="/services" element={<PrivateRoute><Layout><Placeholder title="Services" /></Layout></PrivateRoute>} />
         <Route path="/storage" element={<PrivateRoute><Layout><Storage /></Layout></PrivateRoute>} />
         <Route path="/docker" element={<PrivateRoute><Layout><Docker /></Layout></PrivateRoute>} />
