@@ -1,30 +1,44 @@
 #!/bin/bash
 set -euo pipefail
-echo "======================================================================="
-echo "                        UNINSTALL MYCLOUD PANEL"
-echo "======================================================================="
 
-read -p "Do you want to stop and remove containers and network? (y/n): " rm_containers
-if [ "$rm_containers" == "y" ]; then
-  docker compose down
-  echo "[INFO] Containers removed."
+if [ "$EUID" -ne 0 ]; then
+  echo "[ERROR] This script must be run as root or with sudo."
+  exit 1
 fi
 
-read -p "Do you want to remove Docker IMAGES? (y/n): " rm_images
-if [ "$rm_images" == "y" ]; then
-  docker rmi mycloud-frontend mycloud-backend --force 2>/dev/null || true
-  echo "[INFO] Images removed."
+echo "======================================================================="
+echo "                    MYCLOUD PANEL - UNINSTALLER"
+echo "======================================================================="
+echo "WARNING: This action is DESTRUCTIVE."
+echo "If you proceed, all containers, networks, and images will be removed."
+echo ""
+echo "You will be asked separately if you want to wipe physical data (databases, storage, secrets)."
+echo "======================================================================="
+read -p "Type 'UNINSTALL' to remove the application containers: " confirm
+if [ "$confirm" != "UNINSTALL" ]; then
+    echo "Uninstallation aborted."
+    exit 0
 fi
 
-read -p "DANGEROUS: Do you want to DELETE ALL PERSISTENT DATA (/opt/mycloud)? (y/n): " rm_data
-if [ "$rm_data" == "y" ]; then
-  read -p "Are you absolutely sure? This will wipe databases, files, and backups! (Type 'DELETE'): " confirm_wipe
-  if [ "$confirm_wipe" == "DELETE" ]; then
+echo "[INFO] Bringing down Docker Compose stack..."
+docker compose down --rmi all --volumes --remove-orphans || true
+
+echo "======================================================================="
+echo "                      DANGER: DATA WIPE"
+echo "======================================================================="
+echo "Do you also want to completely delete all physical data?"
+echo "This includes:"
+echo " - /opt/mycloud (MySQL, MongoDB, Redis, Storage, Backups)"
+echo " - /etc/mycloud (Cryptographic Secrets, JWT keys, Passwords)"
+echo "======================================================================="
+read -p "Type 'WIPE' to delete all physical data, or press Enter to keep it: " wipe_confirm
+if [ "$wipe_confirm" == "WIPE" ]; then
+    echo "[INFO] Wiping physical volumes and secrets..."
     rm -rf /opt/mycloud
-    echo "[INFO] ALL DATA REMOVED."
-  else
-    echo "Data wipe aborted."
-  fi
+    rm -rf /etc/mycloud
+    echo "[SUCCESS] All data has been securely wiped."
+else
+    echo "[INFO] Physical data in /opt/mycloud and /etc/mycloud was KEPT."
 fi
 
-echo "[INFO] Uninstall routine completed."
+echo "[SUCCESS] Uninstallation completed."

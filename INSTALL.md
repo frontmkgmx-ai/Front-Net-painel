@@ -1,32 +1,41 @@
-# MyCloud Panel - Install Guide
+# Installation Guide
 
-## INSTALAÇÃO NA VPS
+MyCloud Panel provides an automated, idempotent script that configures everything needed for a secure deployment on a fresh Linux VPS (Ubuntu/Debian recommended).
 
-1. Conecte-se à sua VPS via SSH (Ubuntu 24.04 LTS ou compatível, amd64/arm64).
-2. Clone o repositório e execute a instalação automática:
+## Requirements
+- **OS:** Ubuntu 22.04+ or Debian 11+
+- **Architecture:** x86_64 or ARM64
+- **RAM:** Minimum 2GB (1.5GB available)
+- **User:** Root privileges (or `sudo`)
+
+## 1. Quick Install
+SSH into your server and run:
 
 ```bash
-git clone <URL_DO_REPOSITORIO>
-cd <PASTA_DO_PROJETO>
-
-cp .env.example .env
-
-# Opcional: Edite manualmente ou deixe o instalador gerar os secrets automaticamente
-nano .env
-
-# Execute o instalador master
+git clone https://github.com/frontmkgmx-ai/Front-Net-painel.git
+cd Front-Net-painel
 sudo ./scripts/install.sh
 ```
 
-3. Verifique o status da implantação:
-```bash
-sudo ./scripts/status.sh
-sudo ./scripts/healthcheck.sh
-```
+**What the installer does automatically:**
+1. Checks memory and architecture constraints.
+2. Installs required base dependencies (`curl`, `git`, `openssl`).
+3. Installs Docker and Docker Compose if missing.
+4. Generates a secure configuration directory (`/etc/mycloud/config`).
+5. Generates high-entropy Docker Secrets in `/etc/mycloud/secrets`.
+6. Downloads Docker images and orchestrates the containers.
+7. Triggers initial Prisma Database migrations.
+8. Prints your initial randomized Admin credentials.
 
-## Troubleshooting
+*Note: You do NOT need to create or edit a `.env` file manually. Everything is architecturally decoupled from the source tree.*
 
-- **Bancos de dados não sobem:** Verifique se as portas não estão em uso por processos locais (embora o painel use redes internas, conflitos de IP na bridge podem ocorrer).
-- **Frontend não acessível:** Confirme se as portas 80/443 estão liberadas no Firewall da sua VPS (UFW / Security Lists da nuvem).
-- **HTTPS falhou:** O comando do certbot requer que o DNS já esteja propagado para o IP da VPS. Verifique no ping e tente executar `docker compose exec -T certbot certbot --nginx -d mycloud.cysmk.online` novamente.
-- **Limitações ARM64:** O projeto foi projetado utilizando imagens multi-arch, caso sua VPS utilize ARM64 (ex: Oracle Cloud Ampere), os containers buildados localmente e imagens `mysql`, `mongo`, `redis`, `node:20-alpine` devem funcionar nativamente.
+## 2. Upgrading Existing Installations (Legacy `.env` Migration)
+If you are upgrading from an older version of MyCloud Panel that relied on an `.env` file, simply run `sudo ./scripts/install.sh`. 
+
+The installer will detect the legacy `.env` file, extract your existing passwords/salts, migrate them into the new encrypted `/etc/mycloud/secrets` architecture, and rename the old file to `.env.bak` to prevent accidental exposure. No data will be lost.
+
+## 3. Post-Installation Configuration
+Once the script succeeds:
+1. Navigate to your server's IP or Domain in the browser (`http://YOUR_SERVER_IP`).
+2. Log in using the Admin credentials printed at the end of the script.
+3. Access the `Admin Dashboard` to change your password and manage applications.

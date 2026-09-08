@@ -8,9 +8,11 @@ fi
 
 echo "[INFO] Updating MyCloud Panel Enterprise v3.0..."
 
-# Create a quick pre-update backup of DB just in case
 echo "[INFO] Creating pre-update backup..."
-./scripts/backup.sh || echo "[WARNING] Pre-update backup failed, continuing anyway..."
+./scripts/backup.sh || {
+    echo "[ERROR] Pre-update backup failed. Aborting update to prevent data loss."
+    exit 1
+}
 
 echo "[INFO] Pulling latest code..."
 git pull origin main

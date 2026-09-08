@@ -41,16 +41,16 @@ model User {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   role       Role?      @relation(fields: [roleId], references: [id], onDelete: SetNull)
   sessions   Session[]
   auditLogs  AuditLog[]
   apiKeys    ApiKey[]
+  deployments Deployment[]
+  databases  DatabaseService[]
   buckets    Bucket[]
   files      File[]
   quotas     Quota[]
   usages     Usage[]
-  deployments Deployment[]
 }
 
 model Session {
@@ -95,7 +95,7 @@ model ApiKey {
 }
 
 // ----------------------------------------------------------------------
-// NEW: PaaS / Infrastructure Models
+// PaaS / Infrastructure Models
 // ----------------------------------------------------------------------
 
 model Project {
@@ -115,6 +115,7 @@ model Environment {
   updatedAt   DateTime @updatedAt
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   applications Application[]
+  databases    DatabaseService[]
   @@unique([projectId, name])
 }
 
@@ -125,7 +126,7 @@ model Application {
   description   String?
   
   // Deploy Config
-  sourceType    String   @default("IMAGE") // IMAGE, GIT
+  sourceType    String   @default("IMAGE") // IMAGE, GIT, MARKETPLACE
   imageName     String?  // for IMAGE
   gitRepoUrl    String?  // for GIT
   gitBranch     String?
@@ -144,11 +145,12 @@ model Application {
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-
+  
   environment   Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
   deployments   Deployment[]
   domains       Domain[]
   envs          AppEnvVar[]
+  volumes       Volume[]
 }
 
 model AppEnvVar {
@@ -188,8 +190,52 @@ model Domain {
   application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
 }
 
+// Databases
+model DatabaseService {
+  id            String   @id @default(uuid())
+  environmentId String
+  userId        String?
+  name          String
+  type          String   // MYSQL, POSTGRES, MONGODB, REDIS
+  version       String?
+  
+  dbUser        String
+  dbPassword    String   // Hashed or Secret ID
+  dbName        String?  // Not needed for Redis
+  
+  internalPort  Int
+  publicPort    Int?     // If exposed
+  
+  cpuLimit      Float?
+  memoryLimit   Int?
+  
+  status        String   @default("STOPPED")
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  environment   Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  user          User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  volumes       Volume[]
+}
+
+// Volumes
+model Volume {
+  id              String   @id @default(uuid())
+  name            String
+  mountPath       String
+  applicationId   String?
+  databaseId      String?
+  
+  createdAt       DateTime @default(now())
+  
+  application     Application?     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  database        DatabaseService? @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+}
+
+
 // ----------------------------------------------------------------------
-// Storage Models (Existing, enhanced)
+// Storage Models
 // ----------------------------------------------------------------------
 model Bucket {
   id        String   @id @default(uuid())

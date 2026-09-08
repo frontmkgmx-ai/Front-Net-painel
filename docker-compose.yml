@@ -32,8 +32,6 @@ services:
     restart: unless-stopped
     networks:
       - private_net
-    environment:
-      - VITE_API_URL=https://${DOMAIN}/api
     depends_on:
       - backend
     deploy:
@@ -55,27 +53,32 @@ services:
     restart: unless-stopped
     networks:
       - private_net
+    secrets:
+      - mysql_password
+      - mongodb_password
+      - redis_password
+      - jwt_secret
+      - session_secret
+      - admin_initial_password
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DOMAIN=${DOMAIN}
       - MYSQL_HOST=mysql
       - MYSQL_PORT=3306
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
-      - MYSQL_USER=${MYSQL_USER}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
-      - MONGODB_URI=mongodb://${MONGODB_USER}:${MONGODB_PASSWORD}@mongodb:27017/${MONGODB_DATABASE}?authSource=admin
+      - MYSQL_DATABASE=mycloud
+      - MYSQL_USER=mycloud
+      - MONGODB_HOST=mongodb
+      - MONGODB_PORT=27017
+      - MONGODB_DATABASE=mycloud
+      - MONGODB_USER=mycloud
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - SESSION_SECRET=${SESSION_SECRET}
-      - JWT_SECRET=${JWT_SECRET}
+      - ADMIN_INITIAL_USERNAME=admin
       - STORAGE_PATH=/opt/mycloud/storage
-      - ADMIN_INITIAL_USERNAME=${ADMIN_INITIAL_USERNAME:-kdsinn}
-      - ADMIN_INITIAL_PASSWORD=${ADMIN_INITIAL_PASSWORD}
-      - DATABASE_URL=mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
     volumes:
       - /opt/mycloud/storage:/opt/mycloud/storage
+      - /etc/mycloud/config:/etc/mycloud/config:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       mysql:
         condition: service_healthy
@@ -100,11 +103,14 @@ services:
     restart: unless-stopped
     networks:
       - private_net
+    secrets:
+      - mysql_root_password
+      - mysql_password
     environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
-      - MYSQL_USER=${MYSQL_USER}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_root_password
+      - MYSQL_PASSWORD_FILE=/run/secrets/mysql_password
+      - MYSQL_DATABASE=mycloud
+      - MYSQL_USER=mycloud
     volumes:
       - /opt/mycloud/data/mysql:/var/lib/mysql
     deploy:
@@ -113,7 +119,7 @@ services:
           cpus: '1.0'
           memory: 1G
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$(cat /run/secrets/mysql_root_password)"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -124,10 +130,12 @@ services:
     restart: unless-stopped
     networks:
       - private_net
+    secrets:
+      - mongodb_password
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGODB_USER}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGODB_PASSWORD}
-      - MONGO_INITDB_DATABASE=${MONGODB_DATABASE}
+      - MONGO_INITDB_ROOT_USERNAME=mycloud
+      - MONGO_INITDB_ROOT_PASSWORD_FILE=/run/secrets/mongodb_password
+      - MONGO_INITDB_DATABASE=mycloud
     volumes:
       - /opt/mycloud/data/mongodb:/data/db
     deploy:
@@ -145,9 +153,12 @@ services:
     image: redis:7-alpine
     container_name: mycloud-redis
     restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD}
     networks:
       - private_net
+    secrets:
+      - redis_password
+    command: >
+      sh -c 'exec redis-server --requirepass "$$(cat /run/secrets/redis_password)"'
     volumes:
       - /opt/mycloud/data/redis:/data
     deploy:
@@ -156,7 +167,7 @@ services:
           cpus: '0.5'
           memory: 256M
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$(cat /run/secrets/redis_password)\" ping"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -178,3 +189,19 @@ networks:
 
 volumes:
   certbot-webroot:
+
+secrets:
+  mysql_root_password:
+    file: /etc/mycloud/secrets/mysql_root_password
+  mysql_password:
+    file: /etc/mycloud/secrets/mysql_password
+  mongodb_password:
+    file: /etc/mycloud/secrets/mongodb_password
+  redis_password:
+    file: /etc/mycloud/secrets/redis_password
+  jwt_secret:
+    file: /etc/mycloud/secrets/jwt_secret
+  session_secret:
+    file: /etc/mycloud/secrets/session_secret
+  admin_initial_password:
+    file: /etc/mycloud/secrets/admin_initial_password

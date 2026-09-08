@@ -3,6 +3,7 @@ set -euo pipefail
 
 echo "========================================"
 echo "   MyCloud Panel - Enterprise v3.0 Installer"
+echo "   (Docker Secrets & Config Architecture)"
 echo "========================================"
 
 if [ "$EUID" -ne 0 ]; then
@@ -11,7 +12,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 ARCH=$(uname -m)
-OS=$(grep -E '^(ID|VERSION_ID)=' /etc/os-release | tr '\n' ' ')
+OS=$(grep -E '^(ID|VERSION_ID)=' /etc/os-release | tr '\n' ' ' 2>/dev/null || echo "Unknown")
 echo "[INFO] Detected OS: $OS"
 echo "[INFO] Detected Architecture: $ARCH"
 
@@ -45,23 +46,46 @@ mkdir -p /opt/mycloud/{app,data/mysql,data/mongodb,data/redis,storage,backups,lo
 chmod -R 755 /opt/mycloud
 chmod +x scripts/*.sh
 
-if [ ! -f .env ]; then
-  echo "[INFO] Generating secure .env file..."
-  cp .env.example .env
+SECRETS_DIR="/etc/mycloud/secrets"
+CONFIG_DIR="/etc/mycloud/config"
+mkdir -p "$SECRETS_DIR" "$CONFIG_DIR"
+chmod 700 /etc/mycloud "$SECRETS_DIR" "$CONFIG_DIR"
+
+if [ -f .env ]; then
+  echo "[INFO] Migrating old .env to secure secrets architecture..."
+  source .env || true
   
-  # Generate secure secrets
-  sed -i "s/^ADMIN_INITIAL_PASSWORD=.*/ADMIN_INITIAL_PASSWORD=$(openssl rand -hex 12)/" .env
-  sed -i "s/^MYSQL_ROOT_PASSWORD=.*/MYSQL_ROOT_PASSWORD=$(openssl rand -hex 16)/" .env
-  sed -i "s/^MYSQL_PASSWORD=.*/MYSQL_PASSWORD=$(openssl rand -hex 16)/" .env
-  sed -i "s/^MONGODB_PASSWORD=.*/MONGODB_PASSWORD=$(openssl rand -hex 16)/" .env
-  sed -i "s/^REDIS_PASSWORD=.*/REDIS_PASSWORD=$(openssl rand -hex 16)/" .env
-  sed -i "s/^SESSION_SECRET=.*/SESSION_SECRET=$(openssl rand -base64 32)/" .env
-  sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$(openssl rand -base64 32)/" .env
+  echo -n "${MYSQL_ROOT_PASSWORD:-$(openssl rand -hex 16)}" > "$SECRETS_DIR/mysql_root_password"
+  echo -n "${MYSQL_PASSWORD:-$(openssl rand -hex 16)}" > "$SECRETS_DIR/mysql_password"
+  echo -n "${MONGODB_PASSWORD:-$(openssl rand -hex 16)}" > "$SECRETS_DIR/mongodb_password"
+  echo -n "${REDIS_PASSWORD:-$(openssl rand -hex 16)}" > "$SECRETS_DIR/redis_password"
+  echo -n "${JWT_SECRET:-$(openssl rand -hex 32)}" > "$SECRETS_DIR/jwt_secret"
+  echo -n "${SESSION_SECRET:-$(openssl rand -hex 32)}" > "$SECRETS_DIR/session_secret"
+  echo -n "${ADMIN_INITIAL_PASSWORD:-$(openssl rand -hex 12)}" > "$SECRETS_DIR/admin_initial_password"
+  
+  echo "DOMAIN=${DOMAIN:-mycloud.local}" > "$CONFIG_DIR/mycloud.conf"
+  echo "ADMIN_USERNAME=${ADMIN_INITIAL_USERNAME:-admin}" >> "$CONFIG_DIR/mycloud.conf"
+  
+  mv .env .env.bak
+  echo "[INFO] Old .env backed up to .env.bak and removed."
 else
-  echo "[INFO] .env file already exists. Skipping secret generation to preserve existing data."
+  echo "[INFO] Generating secure Docker Secrets..."
+  [ -f "$SECRETS_DIR/mysql_root_password" ] || openssl rand -hex 16 > "$SECRETS_DIR/mysql_root_password"
+  [ -f "$SECRETS_DIR/mysql_password" ] || openssl rand -hex 16 > "$SECRETS_DIR/mysql_password"
+  [ -f "$SECRETS_DIR/mongodb_password" ] || openssl rand -hex 16 > "$SECRETS_DIR/mongodb_password"
+  [ -f "$SECRETS_DIR/redis_password" ] || openssl rand -hex 16 > "$SECRETS_DIR/redis_password"
+  [ -f "$SECRETS_DIR/jwt_secret" ] || openssl rand -hex 32 > "$SECRETS_DIR/jwt_secret"
+  [ -f "$SECRETS_DIR/session_secret" ] || openssl rand -hex 32 > "$SECRETS_DIR/session_secret"
+  [ -f "$SECRETS_DIR/admin_initial_password" ] || openssl rand -hex 12 > "$SECRETS_DIR/admin_initial_password"
+
+  if [ ! -f "$CONFIG_DIR/mycloud.conf" ]; then
+    echo "DOMAIN=mycloud.local" > "$CONFIG_DIR/mycloud.conf"
+    echo "ADMIN_USERNAME=admin" >> "$CONFIG_DIR/mycloud.conf"
+  fi
 fi
 
-# Ensure docker group exists and we add the current user if needed, but we run as root anyway
+chmod 600 "$SECRETS_DIR"/*
+
 echo "[INFO] Starting Docker containers..."
 docker compose pull
 docker compose up -d --build
@@ -75,8 +99,9 @@ echo "[INFO] Running database migrations..."
 echo "========================================"
 echo "[SUCCESS] Installation Complete!"
 echo "========================================"
-echo "Your initial admin credentials are in the .env file."
-grep "ADMIN_INITIAL_" .env
+echo "Your initial admin password has been securely generated."
+echo "Username: \$(grep ADMIN_USERNAME $CONFIG_DIR/mycloud.conf | cut -d'=' -f2)"
+echo "Password: \$(cat $SECRETS_DIR/admin_initial_password)"
 echo "========================================"
 echo "Useful commands:"
 echo "  sudo ./scripts/status.sh"

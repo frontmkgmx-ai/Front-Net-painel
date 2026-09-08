@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getApps, createApp, deployApp } from '../controllers/appController';
+import { getTemplates, deployTemplate } from '../controllers/marketplaceController';
 import { authenticate } from '../middlewares/auth';
 import { requireRole } from '../middlewares/roles';
 
@@ -8,8 +8,7 @@ const router = Router();
 router.use(authenticate);
 router.use(requireRole(['OWNER', 'ADMIN']));
 
-router.get('/', getApps);
-router.post('/', createApp);
-router.post('/:id/deploy', deployApp);
+router.get('/templates', getTemplates);
+router.post('/deploy', deployTemplate);
 
 export default router;

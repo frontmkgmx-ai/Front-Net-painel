@@ -1,65 +1,38 @@
-# MyCloud Panel
+# MyCloud Panel - Enterprise v3.0
 
-Professional Full Stack Cloud Administration Panel, designed for VPS deployment via Docker.
+A secure, high-performance, self-hosted PaaS and Control Plane for modern VPS infrastructure.
 
-## Architecture
+## 🚀 Key Features
+- **Zero-Config Installation**: Fully automated setup with secure Docker Secrets generation. No `.env` files required.
+- **Docker Compose First**: Built entirely around modern Docker architectures with explicit resource limits.
+- **Automated Backup & Restore**: Secure physical and logical database dumps managed directly from the CLI.
+- **Role-Based Access Control**: Granular roles (`SUPER_ADMIN`, `ADMIN`, `USER`) via Argon2id hashed passwords.
+- **Real-Time Host Monitoring**: Embedded `systeminformation` metrics via websockets (CPU, RAM, Disks, Network Rx/Tx).
 
-- **Frontend:** React 19, TypeScript, Vite, TailwindCSS
-- **Backend:** Node.js, Express, Prisma (MySQL) & Mongoose (MongoDB)
-- **Databases:** MySQL (Relational), MongoDB (Document), Redis (Caching/Queues)
-- **Reverse Proxy:** Nginx with Let's Encrypt SSL ready
-- **Storage:** Persisted physically to `/opt/mycloud/storage`
+## 📦 Installation
 
-## INSTALAÇÃO RÁPIDA NA VPS
-
-1. Conecte-se à sua VPS via SSH (Ubuntu 24.04 LTS ou compatível, amd64/arm64).
-2. Clone o repositório e execute a instalação automática:
+Installing MyCloud Panel is as simple as cloning the repository and running the automated setup script. 
+No manual configuration of passwords or secrets is required.
 
 ```bash
-git clone <URL_DO_REPOSITORIO>
-cd <PASTA_DO_PROJETO>
-
-cp .env.example .env
-
-# Opcional: Edite manualmente ou deixe o instalador gerar os secrets automaticamente
-nano .env
-
-# Execute o instalador master
+git clone https://github.com/frontmkgmx-ai/Front-Net-painel.git
+cd Front-Net-painel
 sudo ./scripts/install.sh
 ```
 
-3. Verifique o status da implantação:
-```bash
-sudo ./scripts/status.sh
-sudo ./scripts/healthcheck.sh
-```
+Upon completion, the installer will automatically generate all necessary cryptographic secrets in `/etc/mycloud/secrets` and output your initial Administrator credentials.
 
-## Comandos Administrativos
+## 🔒 Security Architecture
+The v3.0 architecture eliminates the need for manual `.env` file management.
+- **Docker Secrets**: All cryptographic keys and database passwords are automatically generated and passed natively via Docker Secrets (`/run/secrets/...`).
+- **Configuration Persistence**: Non-secret configurations (e.g., Domains) are stored in `/etc/mycloud/config/mycloud.conf`.
+- **Physical Storage**: All persistent app volumes (MySQL, MongoDB, Redis, Uploads) are strictly mapped to `/opt/mycloud/`.
 
-| Comando | Descrição |
-|---|---|
-| `sudo ./scripts/install.sh` | Instalação do zero, gera diretórios & secrets |
-| `sudo ./scripts/start.sh` | Inicia todos os containers |
-| `sudo ./scripts/stop.sh` | Para todos os containers com segurança |
-| `sudo ./scripts/restart.sh` | Reinicia o ecossistema |
-| `sudo ./scripts/update.sh` | Atualiza repositório, builda e executa migrations sem perda de dados |
-| `sudo ./scripts/backup.sh` | Dump de bancos e compactação de arquivos para `/opt/mycloud/backups` |
-| `sudo ./scripts/restore.sh` | Restaura a partir de um backup específico |
-| `sudo ./scripts/status.sh` | Exibe consumo de CPU, RAM, Disco e Containers |
-| `sudo ./scripts/healthcheck.sh` | Verifica conexões internas do banco e da API |
-| `sudo ./scripts/logs.sh` | Live tail dos logs (pode passar o nome do container, ex: `backend`) |
-| `sudo ./scripts/migrate.sh` | Executa migrations do Prisma |
-| `sudo ./scripts/uninstall.sh` | Remoção da plataforma (Exige confirmação para exclusão de dados) |
+## 🛠 Management Commands
+The `scripts/` directory provides complete lifecycle management tools. All scripts must be run via `sudo`.
 
-## Segurança
-- **Bancos Isolados:** Portas 3306, 27017 e 6379 ficam restritas à rede interna `private_net`.
-- **Criptografia de Senha:** Uso de `Argon2id` para máxima resistência.
-- **RBAC:** Sistema de permissões escalonado.
-- **Sanitização de Paths:** Proteção contra `../` (Path Traversal) no módulo de storage.
-
-## Configuração HTTPS (Let's Encrypt)
-Após propagar o IP no DNS para `mycloud.cysmk.online`:
-```bash
-docker compose exec -T certbot certbot --nginx -d mycloud.cysmk.online
-```
-*(Descomente a seção SSL no `docker/nginx/conf.d/default.conf` e faça restart)*
+- `sudo ./scripts/update.sh` - Auto-backs up your data, pulls the latest code, and rebuilds containers without data loss.
+- `sudo ./scripts/backup.sh` - Creates full encrypted archives of DBs and secrets in `/opt/mycloud/backups`.
+- `sudo ./scripts/restore.sh <path>` - Interactively restores a previous state.
+- `sudo ./scripts/doctor.sh` - Validates the health of your VPS, Docker Daemon, and generated secrets.
+- `sudo ./scripts/status.sh` - Returns the `docker ps` state of your PaaS.
