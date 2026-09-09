@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { DockerService } from '../services/dockerService';
+import { deploymentQueue } from '../queues/deploymentQueue';
 
 const prisma = new PrismaClient();
 
@@ -77,19 +77,28 @@ export const deployTemplate = async (req: Request, res: Response) => {
         sourceType: 'MARKETPLACE',
         imageName: template.image,
         internalPort: template.defaultPort,
-        status: 'DEPLOYING',
+        status: 'QUEUED',
       }
     });
 
-    // Deploy
-    DockerService.deployApplication(app, {})
-      .then(async () => {
-        await prisma.application.update({ where: { id: app.id }, data: { status: 'RUNNING' } });
-      })
-      .catch(async (err) => {
-        console.error('Failed to deploy app:', err);
-        await prisma.application.update({ where: { id: app.id }, data: { status: 'ERROR' } });
-      });
+    const deployment = await prisma.deployment.create({
+       data: {
+         applicationId: app.id,
+         status: 'QUEUED',
+         userId: (req as any).user?.id,
+       }
+    });
+
+    await deploymentQueue.add('deploy', {
+        deploymentId: deployment.id,
+        applicationId: app.id
+    }, {
+        attempts: 3,
+        backoff: {
+            type: 'exponential',
+            delay: 1000
+        }
+    });
 
     res.status(201).json(app);
   } catch (error) {

@@ -1,10 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import Docker from 'dockerode';
+import { docker } from '../services/docker';
 import { prisma } from '../index';
+import { DockerContainerService, DockerStatsService, DockerLogService } from '../services/docker';
 
-const docker = new Docker({ socketPath: '/var/run/docker.sock' });
-
-// Middleware/helper to ensure safe docker actions
 const auditDockerAction = async (userId: string, action: string, resource: string, details: any, req: Request) => {
   await prisma.auditLog.create({
     data: {
@@ -30,8 +28,7 @@ export const getContainers = async (req: Request, res: Response, next: NextFunct
 export const getContainerInfo = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const container = docker.getContainer(id);
-    const data = await container.inspect();
+    const data = await DockerContainerService.getStatus(id);
     res.json(data);
   } catch (error) {
     next(error);
@@ -41,8 +38,7 @@ export const getContainerInfo = async (req: Request, res: Response, next: NextFu
 export const getContainerStats = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
-        const container = docker.getContainer(id);
-        const stats = await container.stats({ stream: false });
+        const stats = await DockerStatsService.getStats(id);
         res.json(stats);
     } catch (error) {
         next(error);
@@ -52,8 +48,7 @@ export const getContainerStats = async (req: Request, res: Response, next: NextF
 export const startContainer = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const container = docker.getContainer(id);
-    await container.start();
+    await DockerContainerService.startContainer(id);
     await auditDockerAction((req as any).user!.id, 'DOCKER_START_CONTAINER', id, {}, req);
     res.json({ success: true, message: 'Container started' });
   } catch (error) {
@@ -64,8 +59,7 @@ export const startContainer = async (req: Request, res: Response, next: NextFunc
 export const stopContainer = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const container = docker.getContainer(id);
-    await container.stop();
+    await DockerContainerService.stopContainer(id);
     await auditDockerAction((req as any).user!.id, 'DOCKER_STOP_CONTAINER', id, {}, req);
     res.json({ success: true, message: 'Container stopped' });
   } catch (error) {
@@ -76,8 +70,7 @@ export const stopContainer = async (req: Request, res: Response, next: NextFunct
 export const restartContainer = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const container = docker.getContainer(id);
-    await container.restart();
+    await DockerContainerService.restartContainer(id);
     await auditDockerAction((req as any).user!.id, 'DOCKER_RESTART_CONTAINER', id, {}, req);
     res.json({ success: true, message: 'Container restarted' });
   } catch (error) {
@@ -89,18 +82,7 @@ export const getContainerLogs = async (req: Request, res: Response, next: NextFu
     try {
         const { id } = req.params;
         const tail = req.query.tail ? parseInt(req.query.tail as string) : 100;
-        const container = docker.getContainer(id);
-        const logs = await container.logs({
-            stdout: true,
-            stderr: true,
-            tail,
-            timestamps: true
-        });
-        // Dockerode returns a buffer, need to parse multiplexed stream
-        // For simplicity in JSON, we can return as hex or attempt to clean it. 
-        // A simple string conversion might include docker stream headers.
-        // We'll strip non-printable characters for a simple implementation.
-        const logString = logs.toString('utf-8').replace(/[\u0000-\u0009\u000B-\u001F\u007F-\u009F]/g, "");
+        const logString = await DockerLogService.getLogs(id, tail);
         res.json({ logs: logString });
     } catch (error) {
         next(error);

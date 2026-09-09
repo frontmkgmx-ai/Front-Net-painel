@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { DockerService } from '../services/dockerService';
+import { DockerContainerService } from '../services/docker';
+import { deploymentQueue } from '../queues/deploymentQueue';
 
 const prisma = new PrismaClient();
 
@@ -12,7 +13,7 @@ export const getApps = async (req: Request, res: Response) => {
     });
     
     const appsWithStatus = await Promise.all(apps.map(async (app) => {
-      const status = await DockerService.getContainerStatus(`mycloud_app_${app.id}`);
+      const status = await DockerContainerService.getStatus(`mycloud_app_${app.id}`);
       let currentStatus = app.status;
       if (status) {
         currentStatus = status.Running ? 'RUNNING' : 'STOPPED';
@@ -43,7 +44,6 @@ export const createApp = async (req: Request, res: Response) => {
       }
       targetEnvId = defaultEnv.id;
     }
-
     const app = await prisma.application.create({
       data: {
         name,
@@ -66,33 +66,46 @@ export const createApp = async (req: Request, res: Response) => {
 export const deployApp = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const app = await prisma.application.update({
-      where: { id },
-      data: { status: 'DEPLOYING' }
-    });
+    const app = await prisma.application.findUnique({ where: { id } });
     
-    const envVars = await prisma.appEnvVar.findMany({ where: { applicationId: id } });
-    const envRecord = envVars.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
+    if (!app) {
+       return res.status(404).json({ error: 'App not found' });
+    }
 
-    DockerService.deployApplication(app, envRecord)
-      .then(async () => {
-        await prisma.application.update({ where: { id: app.id }, data: { status: 'RUNNING' } });
-      })
-      .catch(async (err) => {
-        console.error('Failed to deploy app:', err);
-        await prisma.application.update({ where: { id: app.id }, data: { status: 'ERROR' } });
-      });
-    
-    res.json(app);
+    const deployment = await prisma.deployment.create({
+       data: {
+         applicationId: id,
+         status: 'QUEUED',
+         userId: (req as any).user?.id,
+       }
+    });
+
+    await prisma.application.update({
+      where: { id },
+      data: { status: 'QUEUED' }
+    });
+
+    await deploymentQueue.add('deploy', {
+        deploymentId: deployment.id,
+        applicationId: id
+    }, {
+        attempts: 3,
+        backoff: {
+            type: 'exponential',
+            delay: 1000
+        }
+    });
+
+    res.json({ message: 'Deployment queued successfully', deploymentId: deployment.id });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to deploy app' });
+    res.status(500).json({ error: 'Failed to queue deployment' });
   }
 };
 
 export const startApp = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await DockerService.startContainer(`mycloud_app_${id}`);
+    await DockerContainerService.startContainer(`mycloud_app_${id}`);
     await prisma.application.update({ where: { id }, data: { status: 'RUNNING' } });
     res.json({ success: true });
   } catch (error) {
@@ -103,7 +116,7 @@ export const startApp = async (req: Request, res: Response) => {
 export const stopApp = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await DockerService.stopContainer(`mycloud_app_${id}`);
+    await DockerContainerService.stopContainer(`mycloud_app_${id}`);
     await prisma.application.update({ where: { id }, data: { status: 'STOPPED' } });
     res.json({ success: true });
   } catch (error) {
@@ -114,10 +127,23 @@ export const stopApp = async (req: Request, res: Response) => {
 export const deleteApp = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await DockerService.removeContainer(`mycloud_app_${id}`);
+    await DockerContainerService.removeContainer(`mycloud_app_${id}`);
     await prisma.application.delete({ where: { id } });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete app' });
+  }
+};
+
+export const getDeployments = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const deployments = await prisma.deployment.findMany({
+       where: { applicationId: id },
+       orderBy: { createdAt: 'desc' }
+    });
+    res.json(deployments);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch deployments' });
   }
 };

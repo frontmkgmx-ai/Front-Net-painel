@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+echo "Starting MyCloud Panel Backend..."
+
 # Load secrets into environment variables from Docker Secrets
 export MYSQL_ROOT_PASSWORD=$(cat /run/secrets/mysql_root_password 2>/dev/null || echo "")
 export MYSQL_PASSWORD=$(cat /run/secrets/mysql_password 2>/dev/null || echo "")
@@ -15,7 +17,6 @@ export MYSQL_USER=${MYSQL_USER:-mycloud}
 export MYSQL_DATABASE=${MYSQL_DATABASE:-mycloud}
 export MYSQL_HOST=${MYSQL_HOST:-mysql}
 export MYSQL_PORT=${MYSQL_PORT:-3306}
-
 export MONGODB_USER=${MONGODB_USER:-mycloud}
 export MONGODB_DATABASE=${MONGODB_DATABASE:-mycloud}
 export MONGODB_HOST=${MONGODB_HOST:-mongodb}
@@ -25,5 +26,19 @@ export MONGODB_PORT=${MONGODB_PORT:-27017}
 export DATABASE_URL="mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DATABASE}"
 export MONGODB_URI="mongodb://${MONGODB_USER}:${MONGODB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT}/${MONGODB_DATABASE}?authSource=admin"
 
-# Execute the provided command
+# Check if mandatory secrets are loaded
+if [ -z "$MYSQL_PASSWORD" ]; then
+    echo "[ERROR] MYSQL_PASSWORD is empty. Docker secrets must be configured correctly."
+    exit 1
+fi
+
+if [ -z "$JWT_SECRET" ]; then
+    echo "[ERROR] JWT_SECRET is empty. Docker secrets must be configured correctly."
+    exit 1
+fi
+
+echo "[INFO] Running Prisma migrations..."
+npx prisma migrate deploy
+
+echo "[INFO] Starting the application..."
 exec "$@"

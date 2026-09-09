@@ -1,9 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../index';
 import { z } from 'zod';
-import { LocalStorageProvider } from '../providers/storage/LocalStorageProvider';
+import * as fs from 'fs';
+import * as path from 'path';
 
-const storageProvider = new LocalStorageProvider();
+const STORAGE_ROOT = process.env.STORAGE_PATH || '/opt/mycloud/storage';
+
+const getBucketPath = (bucketId: string) => path.join(STORAGE_ROOT, bucketId);
 
 export const createBucket = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -14,7 +17,7 @@ export const createBucket = async (req: Request, res: Response, next: NextFuncti
       data: { name, ownerId: userId }
     });
     
-    await storageProvider.createBucket(bucket.id);
+    await fs.promises.mkdir(getBucketPath(bucket.id), { recursive: true });
 
     await prisma.auditLog.create({
       data: { userId, action: 'CREATE_BUCKET', details: { bucketId: bucket.id } }
@@ -43,7 +46,8 @@ export const deleteBucket = async (req: Request, res: Response, next: NextFuncti
     const userId = (req as any).user.id;
 
     await prisma.bucket.delete({ where: { id: bucketId } });
-    await storageProvider.deleteBucket(bucketId);
+    
+    await fs.promises.rm(getBucketPath(bucketId), { recursive: true, force: true });
 
     await prisma.auditLog.create({
       data: { userId, action: 'DELETE_BUCKET', details: { bucketId } }
@@ -83,13 +87,12 @@ export const listContents = async (req: Request, res: Response, next: NextFuncti
   try {
     const { bucketId } = req.params;
     const { folderId } = req.query; // optional parentId
-
     const parentId = folderId ? String(folderId) : null;
 
     const folders = await prisma.folder.findMany({
       where: { bucketId, parentId }
     });
-
+    
     const files = await prisma.file.findMany({
       where: { bucketId, folderId: parentId },
       include: { owner: { select: { username: true } } }
@@ -115,10 +118,15 @@ export const uploadFile = async (req: Request, res: Response, next: NextFunction
 
     const bucket = await prisma.bucket.findUnique({ where: { id: bucketId } });
     if (!bucket) {
+      await fs.promises.unlink(file.path).catch(() => {});
       return res.status(404).json({ message: 'Bucket not found' });
     }
 
-    const { path: finalPath, size } = await storageProvider.uploadFile(bucketId, file);
+    const bucketPath = getBucketPath(bucketId);
+    await fs.promises.mkdir(bucketPath, { recursive: true });
+    
+    const finalPath = path.join(bucketPath, file.filename);
+    await fs.promises.rename(file.path, finalPath);
 
     const dbFile = await prisma.file.create({
       data: {
@@ -126,7 +134,7 @@ export const uploadFile = async (req: Request, res: Response, next: NextFunction
         folderId: folderId || null,
         name: file.originalname,
         path: finalPath,
-        size: BigInt(size),
+        size: BigInt(file.size),
         mimeType: file.mimetype,
         ownerId: userId,
       }
@@ -138,6 +146,9 @@ export const uploadFile = async (req: Request, res: Response, next: NextFunction
 
     res.json({ ...dbFile, size: dbFile.size.toString() });
   } catch (error) {
+    if ((req as any).file) {
+      await fs.promises.unlink((req as any).file.path).catch(() => {});
+    }
     next(error);
   }
 };
@@ -168,7 +179,8 @@ export const deleteFile = async (req: Request, res: Response, next: NextFunction
     const file = await prisma.file.findUnique({ where: { id: fileId } });
     if (!file) return res.status(404).json({ message: 'File not found' });
 
-    await storageProvider.deleteFile(file.bucketId, file.path);
+    await fs.promises.unlink(file.path).catch(() => {});
+
     await prisma.file.delete({ where: { id: fileId } });
 
     await prisma.auditLog.create({

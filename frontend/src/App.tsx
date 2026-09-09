@@ -1,9 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { 
   Shield, HardDrive, LayoutDashboard, Database, Server, Settings, Users, 
   LogOut, Lock, Box, Globe, ShieldCheck, Activity, FileText, ShoppingBag, 
-  Key, Code, FolderGit2, Blocks, Cpu
+  Key, Code, FolderGit2, Blocks, Cpu, Menu, X
 } from 'lucide-react';
 
 import Dashboard from './pages/Dashboard';
@@ -19,104 +19,120 @@ import Security from './pages/Security';
 import SettingsPage from './pages/Settings';
 import { useAuthStore } from './store/authStore';
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (val: boolean) => void }) => {
   const logout = useAuthStore(state => state.logout);
   const user = useAuthStore(state => state.user);
 
   return (
-    <div className="w-64 bg-slate-900 text-slate-300 min-h-screen flex flex-col font-sans border-r border-slate-800 shadow-2xl">
-      <div className="p-6 flex items-center gap-3 border-b border-slate-800 bg-slate-950">
-        <Shield className="w-8 h-8 text-indigo-500" />
-        <div>
-          <h1 className="text-lg font-bold text-white tracking-tight">MyCloud</h1>
-          <span className="text-xs text-indigo-400 font-medium tracking-wider uppercase">Enterprise Panel</span>
-        </div>
-      </div>
+    <>
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-950/80 z-40 lg:hidden"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
       
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700">
-        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-3 pt-2">Core</div>
-        <Link to="/" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <LayoutDashboard className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Dashboard
-        </Link>
-        <Link to="/projects" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <FolderGit2 className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Projects
-        </Link>
-        <Link to="/applications" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <Box className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Applications
-        </Link>
-        <Link to="/marketplace" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <ShoppingBag className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Marketplace
-        </Link>
+      {/* Sidebar */}
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-300 flex flex-col font-sans border-r border-slate-800 shadow-2xl transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="p-6 flex items-center justify-between border-b border-slate-800 bg-slate-950">
+          <div className="flex items-center gap-3">
+            <Shield className="w-8 h-8 text-indigo-500" />
+            <div>
+              <h1 className="text-lg font-bold text-white tracking-tight">MyCloud</h1>
+              <span className="text-xs text-indigo-400 font-medium tracking-wider uppercase">Enterprise</span>
+            </div>
+          </div>
+          <button className="lg:hidden text-slate-400 hover:text-white" onClick={() => setIsOpen(false)}>
+            <X className="w-5 h-5" />
+          </button>
+        </div>
         
-        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-3 pt-4">Infrastructure</div>
-        <Link to="/databases" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <Database className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Databases
-        </Link>
-        <Link to="/services" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <Blocks className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Services
-        </Link>
-        <Link to="/storage" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <HardDrive className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Storage
-        </Link>
-        <Link to="/docker" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <Box className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Docker
-        </Link>
-
-        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-3 pt-4">Networking & Security</div>
-        <Link to="/domains" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <Globe className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Domains
-        </Link>
-        <Link to="/ssl" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <ShieldCheck className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> SSL
-        </Link>
-        <Link to="/secrets" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <Key className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Secrets
-        </Link>
-        <Link to="/security" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <Lock className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Security
-        </Link>
-
-        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-3 pt-4">Observability</div>
-        <Link to="/monitoring" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <Activity className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Monitoring
-        </Link>
-        <Link to="/logs" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <FileText className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Logs
-        </Link>
-
-        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-3 pt-4">Management</div>
-        <Link to="/backups" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <HardDrive className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Backups
-        </Link>
-        <Link to="/api" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <Code className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> API
-        </Link>
-        {user?.role === 'SUPER_ADMIN' && (
-          <Link to="/users" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-            <Users className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Users
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700">
+          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-3 pt-2">Core</div>
+          <Link to="/" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <LayoutDashboard className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Dashboard
           </Link>
-        )}
-        <Link to="/system" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <Cpu className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> System
-        </Link>
-        <Link to="/settings" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
-          <Settings className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Settings
-        </Link>
-      </nav>
-      
-      <div className="p-4 border-t border-slate-800 bg-slate-950">
-        <div className="mb-3 text-xs text-slate-400 truncate flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-          {user?.username || 'Guest'}
+          <Link to="/projects" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <FolderGit2 className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Projects
+          </Link>
+          <Link to="/applications" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <Box className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Applications
+          </Link>
+          <Link to="/marketplace" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <ShoppingBag className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Marketplace
+          </Link>
+          
+          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-3 pt-4">Infrastructure</div>
+          <Link to="/databases" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <Database className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Databases
+          </Link>
+          <Link to="/services" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <Blocks className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Services
+          </Link>
+          <Link to="/storage" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <HardDrive className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Storage
+          </Link>
+          <Link to="/docker" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <Box className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Docker
+          </Link>
+
+          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-3 pt-4">Networking & Security</div>
+          <Link to="/domains" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <Globe className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Domains
+          </Link>
+          <Link to="/ssl" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <ShieldCheck className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> SSL
+          </Link>
+          <Link to="/secrets" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <Key className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Secrets
+          </Link>
+          <Link to="/security" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <Lock className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Security
+          </Link>
+
+          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-3 pt-4">Observability</div>
+          <Link to="/monitoring" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <Activity className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Monitoring
+          </Link>
+          <Link to="/logs" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <FileText className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Logs
+          </Link>
+
+          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-3 pt-4">Management</div>
+          <Link to="/backups" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <HardDrive className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Backups
+          </Link>
+          <Link to="/api" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <Code className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> API
+          </Link>
+          {user?.role === 'SUPER_ADMIN' && (
+            <Link to="/users" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+              <Users className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Users
+            </Link>
+          )}
+          <Link to="/system" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <Cpu className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> System
+          </Link>
+          <Link to="/settings" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-white transition group">
+            <Settings className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" /> Settings
+          </Link>
+        </nav>
+        
+        <div className="p-4 border-t border-slate-800 bg-slate-950">
+          <div className="mb-3 text-xs text-slate-400 truncate flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+            {user?.username || 'Guest'}
+          </div>
+          <button 
+            onClick={() => logout()}
+            className="w-full flex items-center justify-center gap-2 p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-red-500/10 hover:text-red-400 transition text-sm font-medium"
+          >
+            <LogOut className="w-4 h-4" /> Logout
+          </button>
         </div>
-        <button 
-          onClick={() => logout()}
-          className="w-full flex items-center justify-center gap-2 p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-red-500/10 hover:text-red-400 transition text-sm font-medium"
-        >
-          <LogOut className="w-4 h-4" /> Logout
-        </button>
       </div>
-    </div>
+    </>
   );
 };
 
@@ -126,11 +142,25 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto">
-        {children}
+      <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
+      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+        {/* Mobile Header */}
+        <header className="lg:hidden flex items-center justify-between p-4 bg-slate-900 border-b border-slate-800">
+          <div className="flex items-center gap-2">
+            <Shield className="w-6 h-6 text-indigo-500" />
+            <h1 className="text-md font-bold text-white tracking-tight">MyCloud</h1>
+          </div>
+          <button onClick={() => setSidebarOpen(true)} className="text-slate-300 p-1">
+            <Menu className="w-6 h-6" />
+          </button>
+        </header>
+        <div className="flex-1 overflow-y-auto">
+          {children}
+        </div>
       </main>
     </div>
   );

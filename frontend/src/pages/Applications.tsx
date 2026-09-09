@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Play, Square, RefreshCw, Trash2, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Box, Play, Square, RefreshCw, Trash2, Loader2, CheckCircle, XCircle, FileText, X } from 'lucide-react';
 import { api } from '../store/authStore';
 
 export default function Applications() {
   const [apps, setApps] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deploymentsModal, setDeploymentsModal] = useState<{appId: string, name: string} | null>(null);
+  const [deployments, setDeployments] = useState<any[]>([]);
+  const [loadingDeployments, setLoadingDeployments] = useState(false);
 
   const fetchApps = async () => {
     try {
@@ -38,8 +41,37 @@ export default function Applications() {
     }
   };
 
+  const openDeployments = async (appId: string, name: string) => {
+    setDeploymentsModal({appId, name});
+    setLoadingDeployments(true);
+    try {
+      const res = await api.get(`/apps/${appId}/deployments`);
+      setDeployments(res.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingDeployments(false);
+    }
+  };
+
+  const refreshDeployments = async () => {
+    if (!deploymentsModal) return;
+    try {
+      const res = await api.get(`/apps/${deploymentsModal.appId}/deployments`);
+      setDeployments(res.data);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    let intv: any;
+    if (deploymentsModal) {
+      intv = setInterval(refreshDeployments, 3000);
+    }
+    return () => clearInterval(intv);
+  }, [deploymentsModal]);
+
   return (
-    <div className="p-8">
+    <div className="p-8 relative">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-slate-800 dark:text-white">Applications</h1>
       </div>
@@ -63,7 +95,7 @@ export default function Applications() {
                       <span className="flex items-center gap-1 text-xs font-medium text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded">
                         <CheckCircle className="w-3 h-3" /> Running
                       </span>
-                    ) : app.currentStatus === 'DEPLOYING' ? (
+                    ) : app.currentStatus === 'QUEUED' || app.currentStatus === 'DEPLOYING' ? (
                       <span className="flex items-center gap-1 text-xs font-medium text-amber-500 bg-amber-500/10 px-2 py-1 rounded">
                         <Loader2 className="w-3 h-3 animate-spin" /> Deploying
                       </span>
@@ -78,6 +110,13 @@ export default function Applications() {
               </div>
               
               <div className="flex gap-2">
+                <button 
+                  onClick={() => openDeployments(app.id, app.name)}
+                  className="p-2 text-slate-400 hover:text-indigo-500 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                  title="Deployments"
+                >
+                  <FileText className="w-5 h-5" />
+                </button>
                 <button 
                   onClick={() => handleAction(app.id, 'start')}
                   disabled={app.currentStatus === 'RUNNING' || app.currentStatus === 'DEPLOYING'}
@@ -96,7 +135,7 @@ export default function Applications() {
                 </button>
                 <button 
                   onClick={() => handleAction(app.id, 'deploy')}
-                  disabled={app.currentStatus === 'DEPLOYING'}
+                  disabled={app.currentStatus === 'DEPLOYING' || app.currentStatus === 'QUEUED'}
                   className="p-2 text-slate-400 hover:text-blue-500 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
                   title="Redeploy"
                 >
@@ -117,6 +156,47 @@ export default function Applications() {
               No applications deployed yet. Head to the Marketplace to install one.
             </div>
           )}
+        </div>
+      )}
+
+      {/* Deployments Modal */}
+      {deploymentsModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-slate-200 dark:border-slate-800 shadow-2xl">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950 rounded-t-xl">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                Deployments: {deploymentsModal.name}
+              </h2>
+              <button onClick={() => setDeploymentsModal(null)} className="text-slate-400 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {loadingDeployments ? (
+                <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin text-indigo-500" /></div>
+              ) : deployments.length === 0 ? (
+                <div className="text-center text-slate-500 py-8">No deployment history found.</div>
+              ) : (
+                deployments.map(dep => (
+                  <div key={dep.id} className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                    <div className="bg-slate-100 dark:bg-slate-800 p-3 flex justify-between items-center text-sm">
+                      <div className="flex items-center gap-3">
+                        <span className={`font-bold ${dep.status === 'SUCCESS' ? 'text-emerald-500' : dep.status === 'FAILED' ? 'text-red-500' : 'text-amber-500'}`}>
+                          {dep.status}
+                        </span>
+                        <span className="text-slate-400">{new Date(dep.createdAt).toLocaleString()}</span>
+                      </div>
+                      <div className="text-slate-400 text-xs">ID: {dep.id}</div>
+                    </div>
+                    <div className="p-4 bg-black text-green-400 font-mono text-xs overflow-x-auto max-h-64 overflow-y-auto">
+                      <pre>{dep.logs || 'No logs available.'}</pre>
+                      {dep.error && <pre className="text-red-400 mt-2">{dep.error}</pre>}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

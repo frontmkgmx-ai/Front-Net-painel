@@ -167,10 +167,16 @@ model Deployment {
   id            String   @id @default(uuid())
   applicationId String
   userId        String?
+  jobId         String?  // BullMQ Job ID
+  version       String?
   commitSha     String?
   commitMsg     String?
-  status        String   // PENDING, BUILDING, DEPLOYING, SUCCESS, FAILED
+  status        String   // QUEUED, RUNNING, SUCCESS, FAILED, CANCELLED
   logs          String?  @db.LongText
+  error         String?  @db.Text
+  duration      Int?     // Duration in milliseconds
+  startedAt     DateTime?
+  finishedAt    DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   

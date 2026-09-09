@@ -1,11 +1,33 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { DockerService } from '../services/dockerService';
+import { PrismaClient, DatabaseService } from '@prisma/client';
+import { DockerContainerService, DockerImageService, DockerNetworkService } from '../services/docker';
 import crypto from 'crypto';
 
 const prisma = new PrismaClient();
-
 const generatePassword = () => crypto.randomBytes(12).toString('hex');
+
+const getDbImage = (type: string, version: string | null) => {
+  const v = version || 'latest';
+  switch (type) {
+    case 'MYSQL': return `mysql:${v}`;
+    case 'POSTGRES': return `postgres:${v}`;
+    case 'MONGODB': return `mongo:${v}`;
+    case 'REDIS': return `redis:${v}-alpine`;
+    case 'MARIADB': return `mariadb:${v}`;
+    default: throw new Error(`Unsupported DB type: ${type}`);
+  }
+};
+
+const getDbEnvVars = (db: DatabaseService): Record<string, string> => {
+  switch (db.type) {
+    case 'MYSQL': return { MYSQL_ROOT_PASSWORD: db.dbPassword, MYSQL_DATABASE: db.dbName || '', MYSQL_USER: db.dbUser, MYSQL_PASSWORD: db.dbPassword };
+    case 'POSTGRES': return { POSTGRES_PASSWORD: db.dbPassword, POSTGRES_DB: db.dbName || '', POSTGRES_USER: db.dbUser };
+    case 'MONGODB': return { MONGO_INITDB_ROOT_USERNAME: db.dbUser, MONGO_INITDB_ROOT_PASSWORD: db.dbPassword, MONGO_INITDB_DATABASE: db.dbName || '' };
+    case 'REDIS': return {}; // Passed via Cmd
+    case 'MARIADB': return { MARIADB_ROOT_PASSWORD: db.dbPassword, MARIADB_DATABASE: db.dbName || '', MARIADB_USER: db.dbUser, MARIADB_PASSWORD: db.dbPassword };
+    default: return {};
+  }
+};
 
 export const getDatabases = async (req: Request, res: Response) => {
   try {
@@ -14,9 +36,8 @@ export const getDatabases = async (req: Request, res: Response) => {
       orderBy: { createdAt: 'desc' }
     });
     
-    // Check actual docker status for each
     const dbsWithStatus = await Promise.all(databases.map(async (db) => {
-      const status = await DockerService.getContainerStatus(`mycloud_db_${db.id}`);
+      const status = await DockerContainerService.getStatus(`mycloud_db_${db.id}`);
       let currentStatus = db.status;
       if (status) {
         currentStatus = status.Running ? 'RUNNING' : 'STOPPED';
@@ -36,14 +57,12 @@ export const createDatabase = async (req: Request, res: Response) => {
   try {
     const { name, type, version, environmentId } = req.body;
     
-    // Auto-generate credentials
     const dbUser = req.body.dbUser || `${type.toLowerCase()}_user_${crypto.randomBytes(4).toString('hex')}`;
     const dbPassword = req.body.dbPassword || generatePassword();
     const dbName = req.body.dbName || name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
     
     let targetEnvId = environmentId;
     if (!targetEnvId) {
-      // Find or create default environment
       let defaultProj = await prisma.project.findFirst({ where: { name: 'Default Project' } });
       if (!defaultProj) {
         defaultProj = await prisma.project.create({ data: { name: 'Default Project' } });
@@ -73,14 +92,33 @@ export const createDatabase = async (req: Request, res: Response) => {
     });
     
     // Async provisioning
-    DockerService.createDatabaseContainer(db)
-      .then(async () => {
+    (async () => {
+      try {
+        const imageName = getDbImage(db.type, db.version);
+        await DockerImageService.pullImage(imageName);
+        await DockerNetworkService.ensureNetwork('mycloud_apps');
+        
+        let Cmd: string[] | undefined = undefined;
+        if (db.type === 'REDIS') {
+          Cmd = ['redis-server', '--requirepass', db.dbPassword];
+        }
+
+        const container = await DockerContainerService.createContainer({
+          imageName,
+          containerName: `mycloud_db_${db.id}`,
+          envVars: getDbEnvVars(db),
+          startCmd: Cmd,
+          networkMode: 'mycloud_apps',
+          memoryLimitMB: db.memoryLimit || undefined,
+        });
+
+        await container.start();
         await prisma.databaseService.update({ where: { id: db.id }, data: { status: 'RUNNING' } });
-      })
-      .catch(async (err) => {
+      } catch (err) {
         console.error('Failed to provision DB:', err);
         await prisma.databaseService.update({ where: { id: db.id }, data: { status: 'ERROR' } });
-      });
+      }
+    })();
     
     res.status(201).json(db);
   } catch (error) {
@@ -95,7 +133,7 @@ export const deleteDatabase = async (req: Request, res: Response) => {
     const db = await prisma.databaseService.findUnique({ where: { id } });
     if (!db) return res.status(404).json({ error: 'Not found' });
     
-    await DockerService.removeContainer(`mycloud_db_${id}`);
+    await DockerContainerService.removeContainer(`mycloud_db_${id}`);
     await prisma.databaseService.delete({ where: { id } });
     
     res.json({ success: true });

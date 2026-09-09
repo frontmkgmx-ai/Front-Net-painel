@@ -3,7 +3,7 @@ import * as argon2 from 'argon2';
 
 export const setupInitialAdmin = async () => {
   try {
-    const adminUsername = process.env.ADMIN_INITIAL_USERNAME || 'kdsinn';
+    const adminUsername = process.env.ADMIN_INITIAL_USERNAME || 'admin';
     const adminPassword = process.env.ADMIN_INITIAL_PASSWORD;
 
     if (!adminPassword) {

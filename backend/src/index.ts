@@ -17,11 +17,12 @@ import databaseRoutes from "./routes/database";
 import marketplaceRoutes from "./routes/marketplace";
 import { errorHandler } from './middlewares/errorHandler';
 import { setupInitialAdmin } from './services/setup';
+import './workers/deploymentWorker';
 
 dotenv.config();
 
 const app = express();
-const port = 3001;
+const port = process.env.PORT || 3000;
 
 export const prisma = new PrismaClient();
 
